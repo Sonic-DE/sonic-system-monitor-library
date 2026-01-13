@@ -2,11 +2,11 @@ cmake_minimum_required(VERSION 3.16)
 
 project(libksysguard)
 
-set(PROJECT_VERSION "6.7.4")
+set(PROJECT_VERSION "6.6.80")
 
 # check with non-Plasma consumers (e.g. KDevelop) before bumping these versions to make sure the KDE CI does not break
 set(QT_MIN_VERSION "6.10.0")
-set(KF6_MIN_VERSION "6.26.0")
+set(KF6_MIN_VERSION "6.22.0")
 set(KDE_COMPILERSETTINGS_LEVEL "5.82")
 
 find_package(ECM ${KF6_MIN_VERSION} REQUIRED NO_MODULE)
@@ -47,7 +47,7 @@ ecm_setup_version(${PROJECT_VERSION}
                   VARIABLE_PREFIX KSYSGUARD
                   VERSION_HEADER "${CMAKE_CURRENT_BINARY_DIR}/ksysguard_version.h"
                   PACKAGE_VERSION_FILE "${CMAKE_CURRENT_BINARY_DIR}/KSysGuardConfigVersion.cmake"
-                  SOVERSION 11
+                  SOVERSION 10
 )
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
@@ -78,12 +78,6 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
     set_package_properties(Sensors PROPERTIES
         TYPE REQUIRED
         PURPOSE "Used for reading hardware sensors")
-
-    find_package(UDev)
-    set_package_properties(UDev PROPERTIES
-        TYPE OPTIONAL
-        PURPOSE "UDev is used for finding graphics cards."
-    )
 endif()
 
 find_package(Libdrm REQUIRED)
@@ -99,8 +93,7 @@ ecm_set_disabled_deprecation_versions(
 add_definitions(-DQT_USE_QSTRINGBUILDER)
 
 set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 
 add_subdirectory( formatter )
 add_subdirectory( processcore )
@@ -114,7 +107,6 @@ endif()
 
 # add clang-format target for all our real source files
 file(GLOB_RECURSE ALL_CLANG_FORMAT_SOURCE_FILES *.cpp *.h)
-list(FILTER ALL_CLANG_FORMAT_SOURCE_FILES EXCLUDE REGEX ".*\\.ccls-cache/.*")
 kde_clang_format(${ALL_CLANG_FORMAT_SOURCE_FILES})
 kde_configure_git_pre_commit_hook(CHECKS CLANG_FORMAT)
 
