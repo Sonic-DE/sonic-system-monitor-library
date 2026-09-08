@@ -8,7 +8,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-import Qt5Compat.GraphicalEffects
+import QtQuick.Effects
 
 import org.kde.kirigami as Kirigami
 
@@ -102,10 +102,14 @@ Item {
             // GraphicalEffects. MultiEffect is completely unusable and using
             // `style: Text.Outline` makes the font rendering look pretty bad.
             layer.enabled: root.constrained
-            layer.effect: Glow {
-                radius: 4
-                spread: 0.75
-                color: Kirigami.Theme.backgroundColor
+            layer.effect: MultiEffect {
+                shadowEnabled: true
+                shadowHorizontalOffset: 0
+                shadowVerticalOffset: 0
+                shadowBlur: 1
+                blurMax: 4
+                shadowScale: 1
+                shadowColor: Kirigami.Theme.backgroundColor
             }
         }
 
