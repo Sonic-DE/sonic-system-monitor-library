@@ -59,6 +59,8 @@ public:
     void readNvidiaData();
 
 private:
+    friend class GpuFdinfoTest;
+
     KSysGuard::ProcessAttribute *m_usage = nullptr;
     KSysGuard::ProcessAttribute *m_memory = nullptr;
     KSysGuard::ProcessAttribute *m_gpuName = nullptr;
@@ -73,6 +75,6 @@ private:
     std::unordered_map<unsigned int, unsigned int> m_nvidiaIndexToGpuNum;
 
     void processPidDir(const fs::path &path, KSysGuard::Process *proc, const std::unordered_map<HistoryKey, GpuFd> &previousValues);
-    bool processPidEntry(const fs::path &path, GpuFd &proc);
+    static bool processPidEntry(const fs::path &path, GpuFd &proc);
     void setupNvidia(const std::vector<GpuInfo> &gpuInfo);
 };
