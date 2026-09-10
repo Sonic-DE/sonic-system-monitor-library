@@ -73,8 +73,9 @@ const fs::path fd_dir{"fd"};
 
 const QByteArrayView engine_prefix{"drm-engine-"};
 const QByteArrayView driver_prefix{"drm-driver"};
-const QByteArrayView mem_resident_prefix{"drm-resident-"};
-const QByteArrayView amd_resident_prefix{"drm-memory-"};
+const QByteArrayView amd_resident_prefix{"drm-memory-"};//deprecated
+const QByteArrayView total_vram_prefix{"drm-total-vram"};
+const QByteArrayView total_gtt_prefix{"drm-total-gtt"};
 const QByteArrayView amd_drm_driver{"amdgpu"};
 const QByteArrayView amd_engine{"gfx"};
 const QByteArrayView intel_drm_driver{"i915"};
@@ -296,8 +297,31 @@ bool GpuPlugin::processPidEntry(const fs::path &path, GpuFd &proc)
     proc.gfx = 0;
     proc.vram = 0;
 
+    const QByteArrayView totalMemoryPrefix{"drm-total-"};
+    const QByteArrayView residentMemoryPrefix{"drm-resident-"};
+    QHash<QByteArray, uint32_t> totalMemory;
+    QHash<QByteArray, uint32_t> residentMemory;
+
     QByteArray driver;
     QHash<QByteArray, uint64_t> engineValues;
+
+    bool foundTotalVramKey = false;
+    bool foundTotalGTTKey = false;
+
+    uint32_t deprecatedVram = 0;
+
+    auto increaseMemory = [](uint32_t &target, const QByteArrayView &value) {
+        const auto mem = to_digits(value).value_or(0);
+        if (value.endsWith("KiB")) {
+            target += mem;
+        }
+        else if (value.endsWith("MiB")) {
+            target += mem * 1024;
+        }
+        else {
+            target += mem / 1024;
+        }
+    };
 
     // Had to use a do/while loop here because f.atEnd() was returning 1
     // until the first f.readLine()
@@ -309,25 +333,40 @@ bool GpuPlugin::processPidEntry(const fs::path &path, GpuFd &proc)
 
         if (value.contains(':')) {
             continue;
-        };
+        }
+
+        // Keep region names until the driver is known; fdinfo key order is not significant.
+        if (key.startsWith(totalMemoryPrefix)) {
+            uint32_t memory = 0;
+            increaseMemory(memory, value);
+            totalMemory.insert(key.mid(totalMemoryPrefix.size()).toByteArray(), memory);
+        } else if (key.startsWith(residentMemoryPrefix)) {
+            uint32_t memory = 0;
+            increaseMemory(memory, value);
+            residentMemory.insert(key.mid(residentMemoryPrefix.size()).toByteArray(), memory);
+        }
+
         if (key == driver_prefix) {
             driver = value.toByteArray();
         } else if (key.startsWith(engine_prefix)) {
             if (const auto digits = to_digits(value)) {
                 engineValues[key.mid(engine_prefix.size())] = digits.value();
             }
-        } else if (key.startsWith(mem_resident_prefix) || key.startsWith(amd_resident_prefix)) {
-            const auto mem = to_digits(value).value_or(0);
-            // Unit can be KiB (matching the attribute), MiB or unspecified (Bytes)
-            if (value.endsWith("KiB")) {
-                proc.vram += mem;
-            } else if (value.endsWith("Mib")) {
-                proc.vram += mem * 1024;
-            } else {
-                proc.vram += mem / 1024;
-            }
+        } else if (key.startsWith(total_vram_prefix) && !foundTotalVramKey) {
+            foundTotalVramKey = true;
+            increaseMemory(proc.vram, value);
+        } else if (key.startsWith(total_gtt_prefix) && !foundTotalGTTKey) {
+            foundTotalGTTKey = true;
+            increaseMemory(proc.vram, value);
+        } else if (key.startsWith(amd_resident_prefix) && !key.endsWith("cpu")) {
+            increaseMemory(deprecatedVram, value);
         }
     } while (!f.atEnd());
+
+    // If the driver only implements the older drm fdinfo keys
+    if (!foundTotalVramKey && !foundTotalGTTKey) {
+        proc.vram += deprecatedVram;
+    }
 
     f.close();
 
@@ -335,6 +374,17 @@ bool GpuPlugin::processPidEntry(const fs::path &path, GpuFd &proc)
         proc.gfx = engineValues[amd_engine];
     } else if (driver == intel_drm_driver) {
         proc.gfx = engineValues[intel_engine];
+        // i915 uses regions such as system0 and local0, not AMD's vram/gtt names.
+        // Prefer totals per region, falling back to resident values without double counting.
+        proc.vram = 0;
+        for (auto memory : totalMemory) {
+            proc.vram += memory;
+        }
+        for (auto it = residentMemory.cbegin(); it != residentMemory.cend(); ++it) {
+            if (!totalMemory.contains(it.key())) {
+                proc.vram += it.value();
+            }
+        }
     }
 
     return (proc.gfx != 0) && (proc.vram != 0);
