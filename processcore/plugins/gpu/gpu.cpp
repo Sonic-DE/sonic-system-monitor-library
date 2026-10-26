@@ -39,6 +39,7 @@ public:
     GpuNameAttribute(QObject *parent)
         : KSysGuard::ProcessAttribute(QStringLiteral("gpu_module"), i18n("GPU"), parent)
     {
+        setGroupAggregation(GroupAggregation::FirstValid);
     }
 
     QVariant cgroupData(KSysGuard::CGroup *cgroup, const QList<KSysGuard::Process *> &groupProcesses) const override
@@ -130,9 +131,11 @@ GpuPlugin::GpuPlugin(QObject *parent, const QVariantList &args)
 {
     m_usage = new KSysGuard::ProcessAttribute(QStringLiteral("gpu_usage"), i18n("GPU Usage"), this);
     m_usage->setUnit(KSysGuard::UnitPercent);
+    m_usage->setGroupAggregation(ProcessAttribute::GroupAggregation::Sum);
     m_usage->setMax(100);
     m_memory = new KSysGuard::ProcessAttribute(QStringLiteral("gpu_memory"), i18n("GPU Memory"), this);
     m_memory->setUnit(KSysGuard::UnitKiloByte);
+    m_memory->setGroupAggregation(ProcessAttribute::GroupAggregation::Sum);
     m_gpuName = new GpuNameAttribute(this);
     m_gpuName->setDescription(i18n("Displays which GPU the process is using"));
 

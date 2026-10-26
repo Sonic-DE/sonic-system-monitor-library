@@ -36,10 +36,12 @@ NetworkPlugin::NetworkPlugin(QObject *parent, const QVariantList &args)
     m_inboundSensor = new ProcessAttribute(QStringLiteral("netInbound"), i18nc("@title", "Download Speed"), this);
     m_inboundSensor->setShortName(i18nc("@title", "Download"));
     m_inboundSensor->setUnit(KSysGuard::UnitByteRate);
+    m_inboundSensor->setGroupAggregation(ProcessAttribute::GroupAggregation::Sum);
     m_inboundSensor->setVisibleByDefault(true);
     m_outboundSensor = new ProcessAttribute(QStringLiteral("netOutbound"), i18nc("@title", "Upload Speed"), this);
     m_outboundSensor->setShortName(i18nc("@title", "Upload"));
     m_outboundSensor->setUnit(KSysGuard::UnitByteRate);
+    m_outboundSensor->setGroupAggregation(ProcessAttribute::GroupAggregation::Sum);
     m_outboundSensor->setVisibleByDefault(true);
 
     addProcessAttribute(m_inboundSensor);

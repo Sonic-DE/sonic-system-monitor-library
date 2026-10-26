@@ -7,10 +7,13 @@
 #pragma once
 
 #include <QAbstractItemModel>
+#include <functional>
 
 #include "process_attribute_model.h"
 
 #include "processcore_export.h"
+
+class ApplicationDiscoveryTest;
 
 namespace KSysGuard
 {
@@ -120,6 +123,8 @@ protected:
     virtual QList<Process *> processesFor(CGroup *cgroup) const;
 
 private:
+    friend class ::ApplicationDiscoveryTest;
+    void setDiscoverySource(const QString &fileSystemRoot, std::function<Process *(qint64)> lookup);
     QScopedPointer<CGroupDataModelPrivate> d;
     void update(CGroup *node);
 };

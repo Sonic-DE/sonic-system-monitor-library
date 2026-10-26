@@ -75,6 +75,7 @@ protected:
     QList<Process *> processesFor(CGroup *cgroup) const override;
 
 private:
+    friend class ::ApplicationDiscoveryTest;
     struct Application {
         QString applicationId;
         QList<CGroup *> cgroups;

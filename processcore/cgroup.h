@@ -80,6 +80,8 @@ public:
      *                 been retrieved.
      */
     void requestPids(QObject *context, std::function<void(QList<pid_t>)> callback);
+    /** The same asynchronous reader with an explicitly selected group mount. */
+    void requestPidsFromRoot(QObject *context, const QString &fileSystemRoot, std::function<void(QList<pid_t>)> callback);
 
     /**
      * Returns the base path to exposed cgroup information. Either /sys/fs/cgroup or /sys/fs/cgroup/unified as applicable

@@ -9,6 +9,7 @@
 #include "formatter.h"
 
 #include <QMetaMethod>
+#include <limits>
 
 using namespace KSysGuard;
 
@@ -30,6 +31,8 @@ public:
     bool m_defaultVisible = false;
 
     Processes::UpdateFlags m_updateFlags = Processes::StandardInformation;
+    GroupAggregation m_groupAggregation = GroupAggregation::Sum;
+    GroupDataFunction m_groupDataFunction;
 };
 
 ProcessAttribute::ProcessAttribute(const QString &id, QObject *parent)
@@ -165,6 +168,10 @@ QVariant ProcessAttribute::cgroupData(KSysGuard::CGroup *cgroup, const QList<KSy
 {
     Q_UNUSED(cgroup)
 
+    if (d->m_groupDataFunction) {
+        return d->m_groupDataFunction(groupProcesses);
+    }
+
     if (groupProcesses.isEmpty()) {
         return QVariant{};
     }
@@ -173,6 +180,57 @@ QVariant ProcessAttribute::cgroupData(KSysGuard::CGroup *cgroup, const QList<KSy
         return total + data(process).toDouble();
     });
     return QVariant(total);
+}
+
+void ProcessAttribute::setGroupAggregation(GroupAggregation policy)
+{
+    d->m_groupAggregation = policy;
+}
+
+ProcessAttribute::GroupAggregation ProcessAttribute::groupAggregation() const
+{
+    return d->m_groupAggregation;
+}
+
+void ProcessAttribute::setGroupDataFunction(GroupDataFunction function)
+{
+    d->m_groupDataFunction = std::move(function);
+}
+
+QVariant ProcessAttribute::groupData(const QList<Process *> &processes) const
+{
+    const auto policy = groupAggregation();
+    if (d->m_groupDataFunction) {
+        return d->m_groupDataFunction(processes);
+    }
+    if (policy == GroupAggregation::Unsupported) {
+        return {};
+    }
+    if (processes.isEmpty()) {
+        // The legacy average is an empty sum converted to zero, divided by
+        // zero. Preserve that result for existing consumers too.
+        return policy == GroupAggregation::Average ? QVariant(std::numeric_limits<qreal>::quiet_NaN()) : QVariant();
+    }
+    if (policy == GroupAggregation::First) {
+        return data(processes.first());
+    }
+    qreal total = 0;
+    for (auto *process : processes) {
+        const auto value = data(process);
+        if (policy == GroupAggregation::FirstValid) {
+            if (value.isValid() && !value.toString().isEmpty()) {
+                return value;
+            }
+            continue;
+        }
+        // Preserve the legacy numeric conversion, including signed priorities,
+        // sentinel values, and missing provider samples converted to zero.
+        total += value.toDouble();
+    }
+    if (policy == GroupAggregation::FirstValid) {
+        return {};
+    }
+    return policy == GroupAggregation::Average ? total / processes.size() : total;
 }
 
 void ProcessAttribute::connectNotify(const QMetaMethod &signal)

@@ -57,6 +57,18 @@ private Q_SLOTS:
         QCOMPARE(cgroup.service()->desktopEntryName(), "org.kde.korgac");
         QCOMPARE(cgroup.service()->name(), "KOrganizer Reminder Client");
     }
+
+    void escapedAndMalformedNamesRemainFinite()
+    {
+        KSysGuard::CGroup malformed(QStringLiteral("app-bad\\xGG-random.scope"));
+        QCOMPARE(malformed.appId(), QStringLiteral("bad\\xGG"));
+        KSysGuard::CGroup truncated(QStringLiteral("app-short\\x-random.scope"));
+        QCOMPARE(truncated.appId(), QStringLiteral("short\\x"));
+        KSysGuard::CGroup backslash(QStringLiteral("app-literal\\x5c-random.scope"));
+        QCOMPARE(backslash.appId(), QStringLiteral("literal\\"));
+        KSysGuard::CGroup escaped(QStringLiteral("app-escaped\\x2dname-random.scope"));
+        QCOMPARE(escaped.appId(), QStringLiteral("escaped-name"));
+    }
 };
 QTEST_MAIN(CGroupTest);
 #include "cgrouptest.moc"

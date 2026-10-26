@@ -7,6 +7,7 @@
 
 #include <QObject>
 #include <QVariant>
+#include <functional>
 
 #include "processes.h"
 #include "unit.h"
@@ -114,6 +115,24 @@ public:
     void clearData(KSysGuard::Process *process);
 
     virtual QVariant cgroupData(KSysGuard::CGroup *cgroup, const QList<KSysGuard::Process *> &groupProcesses = {}) const;
+
+    /** Process-list aggregation, independent of cgroup identity. The default
+     * numeric sum matches the legacy base cgroupData implementation, including
+     * signed values. Custom providers can share a callback between both paths;
+     * no cgroupData override is called with a synthetic or null cgroup.
+     * These nonvirtual additions preserve the exported virtual layout. */
+    enum class GroupAggregation {
+        Unsupported,
+        Sum,
+        Average,
+        First,
+        FirstValid
+    };
+    void setGroupAggregation(GroupAggregation policy);
+    GroupAggregation groupAggregation() const;
+    using GroupDataFunction = std::function<QVariant(const QList<KSysGuard::Process *> &)>;
+    void setGroupDataFunction(GroupDataFunction function);
+    QVariant groupData(const QList<KSysGuard::Process *> &processes) const;
 
 Q_SIGNALS:
     void dataChanged(KSysGuard::Process *process);

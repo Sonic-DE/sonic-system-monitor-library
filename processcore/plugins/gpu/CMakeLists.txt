@@ -1,4 +1,5 @@
 add_library(ksysguard_plugin_gpu MODULE gpu.cpp)
+set_target_properties(ksysguard_plugin_gpu PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/ksysguard/process")
 target_link_libraries(ksysguard_plugin_gpu Qt::Core KSysGuard::ProcessCore KF6::I18n KF6::CoreAddons Libdrm::Libdrm)
 if (UDev_FOUND)
     target_link_libraries(ksysguard_plugin_gpu UDev::UDev)

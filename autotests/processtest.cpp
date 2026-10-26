@@ -9,7 +9,10 @@
 #include <QtCore>
 #include <QtTestGui>
 
+#include <cerrno>
 #include <limits>
+
+#include <sys/resource.h>
 
 #include "processcore/process.h"
 #include "processcore/processes.h"
@@ -54,6 +57,12 @@ void testProcess::testSetScheduler()
     int pid=proc.processId();
     QVERIFY(pid);
 
+    // The child inherits the test runner's niceness, which need not be 0
+    // (e.g. ananicy-cpp runs SSH sessions at nice 16).
+    errno = 0;
+    const int inheritedNiceness = getpriority(PRIO_PROCESS, pid);
+    QCOMPARE(errno, 0);
+
     if (!processController->setScheduler(pid, scheduler, priority))
         QSKIP("skipping verfifcation because setScheduler failed");
 
@@ -65,7 +74,10 @@ void testProcess::testSetScheduler()
 
     QVERIFY(process);
     QCOMPARE(process->scheduler(), scheduler);
-    QCOMPARE(process->niceLevel(), priority);
+    // Realtime policies report their RT priority as the nice level. Switching
+    // to SCHED_IDLE leaves the process's nice value unchanged (sched(7)).
+    const bool realtime = scheduler == KSysGuard::Process::Scheduler::RoundRobin || scheduler == KSysGuard::Process::Scheduler::Fifo;
+    QCOMPARE(process->niceLevel(), (niceness || realtime) ? priority : inheritedNiceness);
 }
 
 void testProcess::testSetIoScheduler_data()

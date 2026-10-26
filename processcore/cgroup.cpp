@@ -20,6 +20,7 @@
 #include "process.h"
 
 #include <ranges>
+#include <utility>
 
 using namespace KSysGuard;
 
@@ -137,7 +138,12 @@ void CGroup::setPids(const QList<pid_t> &pids)
 
 void CGroup::requestPids(QObject *context, std::function<void(QList<pid_t>)> callback)
 {
-    QString path = cgroupSysBasePath() + d->processGroupId + QLatin1String("/cgroup.procs");
+    requestPidsFromRoot(context, cgroupSysBasePath(), std::move(callback));
+}
+
+void CGroup::requestPidsFromRoot(QObject *context, const QString &fileSystemRoot, std::function<void(QList<pid_t>)> callback)
+{
+    QString path = fileSystemRoot + d->processGroupId + QLatin1String("/cgroup.procs");
     auto readPidsRunnable = new CGroupPrivate::ReadPidsRunnable(context, path, callback);
     QThreadPool::globalInstance()->start(readPidsRunnable);
 }
@@ -145,22 +151,26 @@ void CGroup::requestPids(QObject *context, std::function<void(QList<pid_t>)> cal
 QString CGroupPrivate::unescapeName(const QString &name)
 {
     // strings are escaped in the form of \xZZ where ZZ is a two digits in hex representing an ascii code
-    QString rc = name;
-    while (true) {
-        int escapeCharIndex = rc.indexOf(QLatin1Char('\\'));
-        if (escapeCharIndex < 0) {
-            break;
+    QString rc;
+    rc.reserve(name.size());
+    for (int position = 0; position < name.size(); ++position) {
+        if (name.at(position) != QLatin1Char('\\')) {
+            rc.append(name.at(position));
+            continue;
         }
-        const QStringView sequence = QStringView(rc).mid(escapeCharIndex, 4);
+        const QStringView sequence = QStringView(name).mid(position, 4);
         if (sequence.length() != 4 || sequence.at(1) != QLatin1Char('x')) {
             qWarning() << "Badly formed cgroup name" << name;
             return name;
         }
         bool ok;
         int character = sequence.mid(2).toInt(&ok, 16);
-        if (ok) {
-            rc.replace(escapeCharIndex, 4, QLatin1Char(character));
+        if (!ok) {
+            qWarning() << "Badly formed cgroup name" << name;
+            return name;
         }
+        rc.append(QLatin1Char(character));
+        position += 3;
     }
     return rc;
 }

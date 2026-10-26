@@ -46,6 +46,7 @@ public:
         , m_changeFlag(changeFlag)
         , m_groupPolicy(groupPolicy)
     {
+        setGroupAggregation(groupPolicy == Accumulate ? GroupAggregation::Sum : groupPolicy == Average ? GroupAggregation::Average : GroupAggregation::First);
         if (m_changeFlag != 0) {
             connect(parent, &ExtendedProcesses::processChanged, this, [this](KSysGuard::Process *process) {
                 if (!process->changes().testFlag(m_changeFlag)) {

@@ -3,6 +3,10 @@ add_definitions(-DTRANSLATION_DOMAIN=\"processcore\")
 ########### next target ###############
 
 set(ksysguard_LIB_SRCS
+   application_resolver.cpp application_resolver_p.h
+   application_groups.cpp
+   application_process_model.cpp application_process_model.h
+   application_controller.cpp application_controller.h
    application_data_model.cpp application_data_model.h
    cgroup.cpp cgroup.h
    cgroup_data_model.cpp cgroup_data_model.h
@@ -75,6 +79,8 @@ add_subdirectory(identifytool)
 ########### install files ###############
 
 install( FILES
+    application_process_model.h
+    application_controller.h
     processes.h
     process.h
     process_controller.h

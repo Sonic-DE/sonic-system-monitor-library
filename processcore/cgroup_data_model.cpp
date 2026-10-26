@@ -28,6 +28,8 @@ class KSysGuard::CGroupDataModelPrivate
 {
 public:
     QSharedPointer<ExtendedProcesses> m_processes;
+    QString m_fileSystemRoot = CGroup::cgroupSysBasePath();
+    std::function<Process *(qint64)> m_lookup;
     QTimer *m_updateTimer;
     ProcessAttributeModel *m_attributeModel = nullptr;
     QHash<QString, KSysGuard::ProcessAttribute *> m_availableAttributes;
@@ -376,7 +378,7 @@ void CGroupDataModel::setRoot(const QString &root)
         },
         Qt::QueuedConnection);
 
-    const QString path = CGroup::cgroupSysBasePath() + root;
+    const QString path = d->m_fileSystemRoot + root;
     bool available = QFile::exists(path);
 
     if (available) {
@@ -406,7 +408,9 @@ void CGroupDataModel::update()
 
     // In an ideal world we would only the relevant process
     // but Ksysguard::Processes doesn't handle that very well
-    d->m_processes->updateAllProcesses(d->m_updateTimer->interval(), flags);
+    if (!d->m_lookup) {
+        d->m_processes->updateAllProcesses(d->m_updateTimer->interval(), flags);
+    }
 
     update(d->m_rootGroup.data());
 
@@ -439,11 +443,11 @@ void CGroupDataModel::cgroupRemoved(CGroup *)
 void CGroupDataModel::update(CGroup *node)
 {
     namespace fs = std::filesystem;
-    const QString path = CGroup::cgroupSysBasePath() + node->id();
+    const QString path = d->m_fileSystemRoot + node->id();
 
     // Update our own stat info
     // This may trigger some dataChanged
-    node->requestPids(this, [this, node](QList<pid_t> pids) {
+    node->requestPidsFromRoot(this, d->m_fileSystemRoot, [this, node](QList<pid_t> pids) {
         node->setPids(pids);
         d->m_processMap.remove(node);
 
@@ -495,7 +499,7 @@ QList<Process *> CGroupDataModel::processesFor(CGroup *app) const
     QList<Process *> result;
     const auto pids = app->pids();
     std::for_each(pids.begin(), pids.end(), [this, &result](pid_t pid) {
-        auto process = d->m_processes->getProcess(pid);
+        auto process = d->m_lookup ? d->m_lookup(pid) : d->m_processes->getProcess(pid);
         if (process) {
             result.append(process);
         }
@@ -504,4 +508,18 @@ QList<Process *> CGroupDataModel::processesFor(CGroup *app) const
     d->m_processMap.insert(app, result);
 
     return result;
+}
+
+void CGroupDataModel::setDiscoverySource(const QString &fileSystemRoot, std::function<Process *(qint64)> lookup)
+{
+    // Configure before the first queued update. Discovery, grouping, filtering,
+    // asynchronous PID-file reads and cache invalidation remain the real legacy
+    // implementation; tests only replace filesystem location and process lookup.
+    Q_ASSERT(d->m_cgroupMap.isEmpty());
+    setEnabled(false);
+    d->m_fileSystemRoot = fileSystemRoot;
+    d->m_lookup = std::move(lookup);
+    const auto previousRoot = d->m_root;
+    d->m_root.clear();
+    setRoot(previousRoot);
 }
